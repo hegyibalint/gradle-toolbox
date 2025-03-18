@@ -4,31 +4,18 @@
 
 # GIT HELPER FUNCTIONS ---------------------------------------------------------
 
-function _gt_git
+function __gt_git
     git -C $GT_REPOSITORY_DIR $argv
+    or return
 end
 
-function _gt_update
-    echo "Updating repository"
-    _gt_git fetch origin
-end
-
-function _gt_checkout
-    if test (count $argv) -eq 0
-        echo "Usage: gt checkout <branch>"
-        return
-    end
-
-    set branch $argv[1]
-    set branch_dir $GT_WORKTREE_DIR/$branch
-    if _gt_git worktree list | grep -q $branch_dir
-        echo "Branch '$branch' is already checked out, updating in ff-mode"
-        _gt_git update-ref refs/heads/$branch refs/remotes/origin/$branch
-        return 1
+function __gt_worktree_checked_out
+    set -l branch $argv[1]
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+    if test -d $branch_dir
+        return 0
     else
-        echo "Checking out '$branch'"
-        _gt_git worktree add $branch_dir $branch
-        _gt_git worktree list
+        return 1
     end
 end
 
@@ -36,40 +23,133 @@ end
 # SUBCOMMANDS
 # ============================================================================++
 
-function _gt_open
+function __gt_update
+    echo "Updating repository"
+    __gt_git fetch --all
+    or return
+end
+
+function __gt_checkout
+    if test (count $argv) -eq 0
+        echo "Usage: gt checkout <branch>"
+        return 1
+    end
+
+    set -l branch $argv[1]
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+    __gt_git worktree add $branch_dir $branch
+end
+
+function __gt_open
     if test (count $argv) -eq 0
         echo "Usage: gt open <branch>"
+        echo "  create    Create a new branch"
+        echo "  update    Update the repository"
+        echo "  open      Open a branch in IntelliJ IDEA"
+        echo "  install   Install distribution from a branch"
         return
     end
 
-    set branch $argv[1]
-    set branch_dir $GT_WORKTREE_DIR/$branch
-    _gt_checkout $branch
+    set -l branch $argv[1]
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
     idea $branch_dir
 end
 
-function _gt_install
+function __gt_create
+    if test (count $argv) -eq 0
+        echo "Usage: gt create <branch>"
+        return
+    end
+
+    set -l branch $argv[1]
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+
+    # Create a worktree for the new branch
+    __gt_git worktree add -b $branch $branch_dir master
+    or return
+end
+
+function __gt_delete
+    if test (count $argv) -eq 0
+        echo "Usage: gt delete <branch>"
+        return
+    end
+
+    set -l branch $argv[1]
+    # Pop the branch argument off the list
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+
+    echo "Deleting branch '$branch'"
+    __gt_git worktree remove $branch_dir
+    __gt_git branch -D $branch
+end
+
+function __gt_install
     if test (count $argv) -eq 0
         echo "Usage: gt install <branch>"
         return
     end
 
-    if not test -d $GT_DISTS_DIR
-        mkdir -p $GT_DISTS_DIR
+    if not test -d $GT_DIST_DIR
+        mkdir -p $GT_DIST_DIR
     end
 
-    set branch $argv[1]
-    set branch_dir $GT_WORKTREE_DIR/$branch
-    set dist_dir $GT_DISTS_DIR/$branch
+    set -l branch $argv[1]
+    if not __gt_worktree_checked_out $branch
+        echo "Branch '$branch' is not checked out."
+        return 1
+    end
 
-    _gt_checkout $branchs
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+    set -l dist_dir $GT_DIST_DIR/$branch
+
     echo "Installing distribution from branch '$branch' to '$dist_dir'"
     echo ----
     cd $branch_dir
     ./gradlew install -Pgradle_installPath="$dist_dir"
 end
 
-function _gt_init -d "Initializes gradle-toolbox"
+function __gt_use
+    if test (count $argv) -eq 0
+        echo "Usage: gt use <branch>"
+        return
+    end
+    set -l branch $argv[1]
+
+    if not test -d $GT_DIST_DIR/$branch
+        read -P "Branch '$branch' is not installed yet. Should be installed now? [Y/n] " -l should_install
+        if test -z $should_install; or test $should_install = y
+            __gt_install $branch
+        else
+            return
+        end
+    end
+
+    # Make the home directory for the branch
+    mkdir -p $GT_HOME_DIR/$branch
+    # Alias the gradle command to the new distribution
+    alias gradle="gt run $branch"
+    echo "Gradle is now aliased to the distribution from branch '$branch'"
+end
+
+function __gt_run
+    if test (count $argv) -eq 0
+        echo "Usage: gt run <branch> [args]"
+        return
+    end
+    set -l branch $argv[1]
+    set -e argv[1]
+    set -l gradle_command "$GT_DIST_DIR/$branch/bin/gradle -Duser.home=$GT_HOME_DIR/$branch $argv"
+
+    set_color magenta
+    echo "Running gradle from branch '$branch'"
+    echo "Gradle command: $gradle_command"
+    set_color normal
+    echo ----
+    eval $gradle_command
+end
+
+function __gt_init
     # If $GT_DIR doesn't exist, create it
     if not test -d $GT_DIR
         mkdir -p $GT_DIR
@@ -80,12 +160,12 @@ function _gt_init -d "Initializes gradle-toolbox"
         mkdir -p $GT_REPOSITORY_DIR
     end
     # Checks if the repo is already initialized
-    if _gt_git rev-parse 2>/dev/null
+    if __gt_git rev-parse 2>/dev/null
         echo "Repository already initialized"
     else
         git init --bare $GT_DIR/repo
-        _gt_git remote add origin git@github.com:gradle/gradle.git
-        _gt_git fetch
+        __gt_git remote add origin git@github.com:gradle/gradle.git
+        __gt_git fetch
         echo "Repository initialized"
     end
 end
@@ -94,32 +174,48 @@ end
 # ENTRY
 # ============================================================================++
 
-function gt
+function gt -d "Gradle toolbox"
     if test (count $argv) -eq 0
         echo "Usage: gt <subcommand> [args]"
-        echo "Subcommands:"
-        echo "  init      Initialize a new git repository"
-        echo "  checkout  Checkout a branch"
+        echo "  Initialization:"
+        echo "    init      Initialize a new git repository"
+        echo "  Repository operations:"
+        echo "    update    Update the repository"
+        echo "  Branch operations:"
+        echo "    create    Create a new branch"
+        echo "    checkout  Check out branch"
+        echo "    delete    Delete a branch"
+        echo "  Development operations:"
+        echo "    open      Open a branch in IntelliJ IDEA"
+        echo "    install   Install distribution from a branch"
+        echo "    use       Use the distribution from a branch"
+
         return
     end
 
     # First parameter
-    set subcommand $argv[1]
+    set -l subcommand $argv[1]
     set -e argv[1]
 
     switch $subcommand
         case init
-            _gt_init $argv
+            __gt_init $argv
+        case create
+            __gt_create $argv
+        case delete
+            __gt_delete $argv
         case update
-            _gt_update $argv
+            __gt_update $argv
         case checkout
-            _gt_checkout $argv
-        case install
-            _gt_install $argv
+            __gt_checkout $argv
         case open
-            _gt_open $argv
-        case git
-            _gt_git $argv
+            __gt_open $argv
+        case install
+            __gt_install $argv
+        case use
+            __gt_use $argv
+        case run
+            __gt_run $argv
         case '*'
             echo "Unknown command: $subcommand"
     end
