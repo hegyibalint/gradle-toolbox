@@ -1,46 +1,90 @@
-# ============================================================================++
+# ==============================================================================
 # UTILITY FUNCTIONS
-# ============================================================================++
+# ==============================================================================
 
 # GIT HELPER FUNCTIONS ---------------------------------------------------------
 
-function __gt_git
+function __gt_exec_git
     git -C $GT_REPOSITORY_DIR $argv
     or return
 end
 
-function __gt_worktree_checked_out
+function __gt_git_update
+    __gt_exec_git fetch --all
+    or return
+end
+
+function __gt_checkout_branch
+    set -l branch $argv[1]
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+    __gt_git_update
+    __gt_exec_git worktree add $branch_dir $branch
+end
+
+function __gt_is_worktree_checked_out
     set -l branch $argv[1]
     set -l branch_dir $GT_WORKTREE_DIR/$branch
     if test -d $branch_dir
         return 0
     else
-        return 1
+        echo "Branch '$branch' is not checked out. Should I check it out? [Y/n]"
+        read -l checkout
+        if test "$checkout" = Y
+            __gt_checkout_branch $branch
+        else
+            return 1
+        end
     end
 end
 
-# ============================================================================++
+# ==============================================================================
 # SUBCOMMANDS
-# ============================================================================++
+# ==============================================================================
 
-function __gt_update
-    echo "Updating repository"
-    __gt_git fetch --all
+function __gt_command_git
+    __gt_exec_git $argv
     or return
 end
 
-function __gt_checkout
+function __gt_command_run
+    set -l branch $argv[1]
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+    if not test -d $branch_dir
+        echo "Branch '$branch' is not checked out."
+        return 1
+    end
+
+    set -l gradle_executable $branch_dir/build/dist/bin/gradle
+    if not test -x $gradle_executable
+        echo "Distribution for branch '$branch' is not installed."
+        return 1
+    end
+
+    set_color yellow
+    echo -n "Running gradle from branch "
+    set_color --bold
+    echo $branch
+    set_color normal
+    echo ----
+    $gradle_executable $argv[2..-1]
+end
+
+function __gt_command_update
+    __gt_git_update
+    or return
+end
+
+function __gt_command_checkout
     if test (count $argv) -eq 0
         echo "Usage: gt checkout <branch>"
         return 1
     end
 
     set -l branch $argv[1]
-    set -l branch_dir $GT_WORKTREE_DIR/$branch
-    __gt_git worktree add $branch_dir $branch
+    __gt_checkout_branch $branch
 end
 
-function __gt_open
+function __gt_command_open
     if test (count $argv) -eq 0
         echo "Usage: gt open <branch>"
         echo "  create    Create a new branch"
@@ -55,7 +99,23 @@ function __gt_open
     idea $branch_dir
 end
 
-function __gt_create
+function __gt_command_cd
+    if test (count $argv) -eq 0
+        echo "Usage: gt cd <branch>"
+        return 1
+    end
+
+    set -l branch $argv[1]
+    set -l branch_dir $GT_WORKTREE_DIR/$branch
+    if not test -d $branch_dir
+        echo "Branch '$branch' is not checked out."
+        return 1
+    end
+
+    cd $branch_dir
+end
+
+function __gt_command_create
     if test (count $argv) -eq 0
         echo "Usage: gt create <branch>"
         return
@@ -65,11 +125,11 @@ function __gt_create
     set -l branch_dir $GT_WORKTREE_DIR/$branch
 
     # Create a worktree for the new branch
-    __gt_git worktree add -b $branch $branch_dir master
+    __gt_exec_git worktree add -b $branch $branch_dir master
     or return
 end
 
-function __gt_delete
+function __gt_command_delete
     if test (count $argv) -eq 0
         echo "Usage: gt delete <branch>"
         return
@@ -80,94 +140,51 @@ function __gt_delete
     set -l branch_dir $GT_WORKTREE_DIR/$branch
 
     echo "Deleting branch '$branch'"
-    __gt_git worktree remove $branch_dir
-    __gt_git branch -D $branch
+    __gt_exec_git worktree remove $branch_dir
+    __gt_exec_git branch -D $branch
 end
 
-function __gt_install
+function __gt_command_install
     if test (count $argv) -eq 0
         echo "Usage: gt install <branch>"
         return
     end
 
-    if not test -d $GT_DIST_DIR
-        mkdir -p $GT_DIST_DIR
-    end
-
     set -l branch $argv[1]
-    if not __gt_worktree_checked_out $branch
+    if not __gt_is_worktree_checked_out $branch
         echo "Branch '$branch' is not checked out."
         return 1
     end
 
-    set -l branch_dir $GT_WORKTREE_DIR/$branch
-    set -l dist_dir $GT_DIST_DIR/$branch
-
-    echo "Installing distribution from branch '$branch' to '$dist_dir'"
-    echo ----
-    cd $branch_dir
-    ./gradlew install -Pgradle_installPath="$dist_dir"
+    cd $GT_WORKTREE_DIR/$branch
+    ./gradlew install -Pgradle_installPath="build/dist"
 end
 
-function __gt_use
+function __gt_command_use
     if test (count $argv) -eq 0
         echo "Usage: gt use <branch>"
         return
     end
-    set -l branch $argv[1]
 
-    if not test -d $GT_DIST_DIR/$branch
-        read -P "Branch '$branch' is not installed yet. Should be installed now? [Y/n] " -l should_install
-        if test -z $should_install; or test $should_install = y
+    set -l branch $argv[1]
+    if not __gt_is_worktree_checked_out $branch
+        return 1
+    end
+
+    set -l dist_dir $GT_WORKTREE_DIR/$branch/build/dist
+    if not test -d $dist_dir
+        echo "Distribution for branch '$branch' is not installed. Should I install? [Y/n]"
+        read -l install
+        if test "$install" = Y
             __gt_install $branch
         else
-            return
+            return 1
         end
     end
 
-    # Make the home directory for the branch
-    mkdir -p $GT_HOME_DIR/$branch
     # Alias the gradle command to the new distribution
-    alias gradle="gt run $branch"
+    alias gradle="__gt_command_run $branch"
     echo "Gradle is now aliased to the distribution from branch '$branch'"
-end
-
-function __gt_run
-    if test (count $argv) -eq 0
-        echo "Usage: gt run <branch> [args]"
-        return
-    end
-    set -l branch $argv[1]
-    set -e argv[1]
-    set -l gradle_command "$GT_DIST_DIR/$branch/bin/gradle -Duser.home=$GT_HOME_DIR/$branch $argv"
-
-    set_color magenta
-    echo "Running gradle from branch '$branch'"
-    echo "Gradle command: $gradle_command"
-    set_color normal
-    echo ----
-    eval $gradle_command
-end
-
-function __gt_init
-    # If $GT_DIR doesn't exist, create it
-    if not test -d $GT_DIR
-        mkdir -p $GT_DIR
-    end
-
-    # If $GT_DIR/repo doesn't exist, create it
-    if not test -d $GT_REPOSITORY_DIR
-        mkdir -p $GT_REPOSITORY_DIR
-    end
-    # Checks if the repo is already initialized
-    if __gt_git rev-parse 2>/dev/null
-        echo "Repository already initialized"
-    else
-        git init --bare $GT_DIR/repo
-        __gt_git remote add origin git@github.com:gradle/gradle.git
-        __gt_git fetch
-        echo "Repository initialized"
-    end
 end
 
 # ============================================================================++
@@ -180,11 +197,11 @@ function gt -d "Gradle toolbox"
         echo "  Initialization:"
         echo "    init      Initialize a new git repository"
         echo "  Repository operations:"
-        echo "    update    Update the repository"
-        echo "  Branch operations:"
         echo "    create    Create a new branch"
+        echo "    update    Update the repository"
         echo "    checkout  Check out branch"
         echo "    delete    Delete a branch"
+        echo "    git       Git command alias for the repository"
         echo "  Development operations:"
         echo "    open      Open a branch in IntelliJ IDEA"
         echo "    install   Install distribution from a branch"
@@ -199,23 +216,31 @@ function gt -d "Gradle toolbox"
 
     switch $subcommand
         case init
-            __gt_init $argv
+            __gt_command_init $argv
+
+            # Repository operations
         case create
-            __gt_create $argv
-        case delete
-            __gt_delete $argv
+            __gt_command_create $argv
         case update
-            __gt_update $argv
+            __gt_command_update $argv
         case checkout
-            __gt_checkout $argv
+            __gt_command_checkout $argv
+        case delete
+            __gt_command_delete $argv
+        case git
+            __gt_command_git $argv
+
+            # Development
         case open
-            __gt_open $argv
+            __gt_command_open $argv
+        case cd
+            __gt_command_cd $argv
         case install
-            __gt_install $argv
+            __gt_command_install $argv
         case use
-            __gt_use $argv
-        case run
-            __gt_run $argv
+            __gt_command_use $argv
+
+            # Default
         case '*'
             echo "Unknown command: $subcommand"
     end

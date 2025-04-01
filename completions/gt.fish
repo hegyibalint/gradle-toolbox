@@ -1,5 +1,5 @@
 # Define the subcommands
-set -l commands init create delete update checkout open install use git
+set -l commands init create delete update checkout open install use git cd
 
 # Define the main subcommands
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
@@ -15,19 +15,21 @@ complete --command gt --no-files --condition "not __fish_seen_subcommand_from $c
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments open --description "Open a branch in IntelliJ IDEA"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
-    --arguments install --description "Install a distribution from a branch"
+    --arguments install --description "Install distribution from branch"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
-    --arguments use --description "Use a branch as 'gradle'"
+    --arguments use --description "Use branch as gradle"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments git --description "Run a git command on the repository"
+complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
+    --arguments cd --description "Change directory to branch worktree"
 
 
-function __gt_list_checkouted_branches --description "List all branches in gradle-toolbox repository"
-    __gt_git worktree list --porcelain | grep branch | string replace -r '^branch refs/heads/' ''
+function __gt_list_checkouted_branches --description "List all checked-out branches in gradle-toolbox repository"
+    __gt_exec_git worktree list --porcelain | grep branch | string replace -r '^branch refs/heads/' ''
 end
 
-function __gt_list_remote_branches --description "List local branches in gradle-toolbox repository"
-    __gt_git for-each-ref --sort=-committerdate --format='%(refname:short),%(committerdate:short)' refs/remotes/origin | grep "^origin" | string replace -r '^origin/' '' | while read -l line
+function __gt_list_remote_branches --description "List remote branches in gradle-toolbox repository"
+    __gt_exec_git for-each-ref --sort=-committerdate --format='%(refname:short),%(committerdate:short)' refs/remotes/origin | grep "^origin" | string replace -r '^origin/' '' | while read -l line
         set parts (string split "," $line)
         echo -e "$parts[1]\t$parts[2]"
     end
@@ -50,3 +52,6 @@ complete --command gt --no-files --condition "__fish_seen_subcommand_from use" -
 
 # Open sub-command -------------------------------------------------------------
 complete --command gt --no-files --condition "__fish_seen_subcommand_from open" --arguments "(__gt_list_checkouted_branches)" --keep-order
+
+# CD sub-command ---------------------------------------------------------------
+complete --command gt --no-files --condition "__fish_seen_subcommand_from cd" --arguments "(__gt_list_checkouted_branches)" --keep-order
