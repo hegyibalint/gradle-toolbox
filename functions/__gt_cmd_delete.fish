@@ -9,6 +9,6 @@ function __gt_cmd_delete
     set -l branch_dir $GT_WORKTREE_DIR/$branch
 
     echo "Deleting branch '$branch'"
-    __gt_util_git_exec worktree remove $branch_dir
+    __gt_util_git_exec worktree remove --force $branch_dir
     __gt_util_git_exec branch -D $branch
 end

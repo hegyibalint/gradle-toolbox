@@ -23,4 +23,5 @@ function __gt_cmd_use
     # Alias the gradle command to the new distribution
     alias gradle="__gt_cmd_run $branch"
     echo "Gradle is now aliased to the distribution from branch '$branch'"
+    echo "Distribution path: $dist_dir"
 end
