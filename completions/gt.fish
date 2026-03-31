@@ -55,6 +55,7 @@ complete --command gt --no-files --condition "__fish_seen_subcommand_from checko
 complete --command gt --no-files --condition "__fish_seen_subcommand_from pull" --keep-order --description "GitHub PR number"
 
 # Install sub-command ----------------------------------------------------------
+complete --command gt --no-files --condition "__fish_seen_subcommand_from install" --long-option all --description "Install full distribution (with sources)"
 complete --command gt --no-files --condition "__fish_seen_subcommand_from install" --arguments "(__gt_list_checkouted_branches)" --keep-order --description "Branch to install"
 
 # Use sub-command --------------------------------------------------------------
