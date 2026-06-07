@@ -7,12 +7,14 @@ function gt -d "Gradle toolbox"
         echo "    update    Update the repository"
         echo "    git       Git command alias for the repository"
         echo "  Worktree operations:"
-        echo "    create    Create a new branch [--open/-o]"
+        echo "    create    Create a new branch [--open/-o] [--navigate/-n]"
         echo "    checkout  Check out branch"
         echo "    pull      Fetch and checkout a GitHub PR [--open/-o]"
         echo "    delete    Delete a branch"
+        echo "    cleanup   Delete branches whose PRs are closed/merged"
         echo "    move      Move/rename a branch and its worktree"
         echo "    open      Open a branch in IntelliJ IDEA"
+        echo "    pwd       Print the worktree path of a branch"
         echo "    install   Install distribution from a branch"
         echo "    use       Use the distribution from a branch"
 
@@ -38,6 +40,8 @@ function gt -d "Gradle toolbox"
             __gt_cmd_pull $argv
         case delete
             __gt_cmd_delete $argv
+        case cleanup
+            __gt_cmd_cleanup $argv
         case move
             __gt_cmd_move $argv
         case git
@@ -48,6 +52,8 @@ function gt -d "Gradle toolbox"
             __gt_cmd_open $argv
         case cd
             __gt_cmd_cd $argv
+        case pwd
+            __gt_cmd_pwd $argv
         case install
             __gt_cmd_install $argv
         case use

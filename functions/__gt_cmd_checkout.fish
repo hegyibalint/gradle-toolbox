@@ -11,7 +11,8 @@ function __gt_cmd_checkout
     set -l branch $argv[1]
     set -l branch_dir $GT_WORKTREE_DIR/$branch
 
-    __gt_util_worktree_add $branch
+    __gt_util_git_fetch
+    __gt_util_worktree_add $branch $branch
     or return
 
     if set -q _flag_open

@@ -17,8 +17,8 @@ function __gt_cmd_pull
     __gt_util_git_exec fetch origin pull/$pr_number/head:$branch
     or return
 
-    # Create a worktree for the PR branch
-    __gt_util_git_exec worktree add $branch_dir $branch
+    # Create a worktree for the PR branch (fetched above)
+    __gt_util_worktree_add $branch $branch
     or return
 
     echo "Created branch '$branch' at $branch_dir"

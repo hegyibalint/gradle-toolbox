@@ -7,7 +7,8 @@ function __gt_util_worktree_check
         echo "Branch '$branch' is not checked out. Should I check it out? [Y/n]"
         read -l checkout
         if test "$checkout" = Y
-            __gt_util_worktree_add $branch
+            __gt_util_git_fetch
+            __gt_util_worktree_add $branch $branch
         else
             return 1
         end

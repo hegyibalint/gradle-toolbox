@@ -1,5 +1,5 @@
 # Define the subcommands
-set -l commands init create delete move update checkout pull open install use git cd
+set -l commands init create delete cleanup move update checkout pull open install use git cd pwd
 
 # Define the main subcommands
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
@@ -8,6 +8,8 @@ complete --command gt --no-files --condition "not __fish_seen_subcommand_from $c
     --arguments create --description "Creates a new branch"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments delete --description "Deletes a branch"
+complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
+    --arguments cleanup --description "Delete branches whose PRs are closed/merged"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments move --description "Move/rename a branch and its worktree"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
@@ -26,6 +28,8 @@ complete --command gt --no-files --condition "not __fish_seen_subcommand_from $c
     --arguments git --description "Run a git command on the repository"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments cd --description "Change directory to branch worktree"
+complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
+    --arguments pwd --description "Print the worktree path of a branch"
 
 
 function __gt_list_checkouted_branches --description "List all checked-out branches in gradle-toolbox repository"
@@ -40,6 +44,8 @@ function __gt_list_remote_branches --description "List remote branches in gradle
 end
 
 # Create sub-command -----------------------------------------------------------
+complete --command gt --no-files --condition "__fish_seen_subcommand_from create" --short-option o --long-option open --description "Open the new branch in IntelliJ IDEA"
+complete --command gt --no-files --condition "__fish_seen_subcommand_from create" --short-option n --long-option navigate --description "cd into the new worktree after creating it"
 complete --command gt --no-files --condition "__fish_seen_subcommand_from create" --keep-order --description "Branch to create"
 
 # Delete sub-command -----------------------------------------------------------
@@ -66,3 +72,6 @@ complete --command gt --no-files --condition "__fish_seen_subcommand_from open" 
 
 # CD sub-command ---------------------------------------------------------------
 complete --command gt --no-files --condition "__fish_seen_subcommand_from cd" --arguments "(__gt_list_checkouted_branches)" --keep-order
+
+# PWD sub-command --------------------------------------------------------------
+complete --command gt --no-files --condition "__fish_seen_subcommand_from pwd" --arguments "(__gt_list_checkouted_branches)" --keep-order
