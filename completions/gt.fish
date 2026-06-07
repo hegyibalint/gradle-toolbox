@@ -1,5 +1,5 @@
 # Define the subcommands
-set -l commands init create delete cleanup move update checkout pull open install use git cd pwd
+set -l commands init create delete cleanup move update checkout pull open install use git cd pwd doctor
 
 # Define the main subcommands
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
@@ -9,7 +9,7 @@ complete --command gt --no-files --condition "not __fish_seen_subcommand_from $c
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments delete --description "Deletes a branch"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
-    --arguments cleanup --description "Delete branches whose PRs are closed/merged"
+    --arguments cleanup --description "Reclaim disk caches or prune merged-PR branches"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments move --description "Move/rename a branch and its worktree"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
@@ -30,6 +30,8 @@ complete --command gt --no-files --condition "not __fish_seen_subcommand_from $c
     --arguments cd --description "Change directory to branch worktree"
 complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
     --arguments pwd --description "Print the worktree path of a branch"
+complete --command gt --no-files --condition "not __fish_seen_subcommand_from $commands" \
+    --arguments doctor --description "Re-provision shared resources into all worktrees"
 
 
 function __gt_list_checkouted_branches --description "List all checked-out branches in gradle-toolbox repository"
@@ -47,6 +49,18 @@ end
 complete --command gt --no-files --condition "__fish_seen_subcommand_from create" --short-option o --long-option open --description "Open the new branch in IntelliJ IDEA"
 complete --command gt --no-files --condition "__fish_seen_subcommand_from create" --short-option n --long-option navigate --description "cd into the new worktree after creating it"
 complete --command gt --no-files --condition "__fish_seen_subcommand_from create" --keep-order --description "Branch to create"
+
+# Cleanup sub-command ----------------------------------------------------------
+complete --command gt --no-files --condition "__fish_seen_subcommand_from cleanup; and not __fish_seen_subcommand_from cache pr" \
+    --arguments cache --description "Delete build/ and .gradle/ caches from worktrees"
+complete --command gt --no-files --condition "__fish_seen_subcommand_from cleanup; and not __fish_seen_subcommand_from cache pr" \
+    --arguments pr --description "Delete branches whose PRs are closed/merged"
+complete --command gt --no-files --condition "__fish_seen_subcommand_from cleanup; and __fish_seen_subcommand_from cache" \
+    --long-option dry-run --description "Show what would be freed without deleting"
+complete --command gt --no-files --condition "__fish_seen_subcommand_from cleanup; and __fish_seen_subcommand_from cache" \
+    --arguments "(__gt_list_checkouted_branches)" --keep-order --description "Limit to branch"
+complete --command gt --no-files --condition "__fish_seen_subcommand_from cleanup; and __fish_seen_subcommand_from pr" \
+    --long-option dry-run --description "Show which branches would be deleted without deleting"
 
 # Delete sub-command -----------------------------------------------------------
 complete --command gt --no-files --condition "__fish_seen_subcommand_from delete" --arguments "(__gt_list_checkouted_branches)" --keep-order --description "Branch to delete"

@@ -11,12 +11,13 @@ function gt -d "Gradle toolbox"
         echo "    checkout  Check out branch"
         echo "    pull      Fetch and checkout a GitHub PR [--open/-o]"
         echo "    delete    Delete a branch"
-        echo "    cleanup   Delete branches whose PRs are closed/merged"
+        echo "    cleanup   Reclaim disk (cache) or prune merged-PR branches (pr)"
         echo "    move      Move/rename a branch and its worktree"
         echo "    open      Open a branch in IntelliJ IDEA"
         echo "    pwd       Print the worktree path of a branch"
         echo "    install   Install distribution from a branch"
         echo "    use       Use the distribution from a branch"
+        echo "    doctor    Re-provision shared resources into all worktrees"
 
         return
     end
@@ -58,6 +59,8 @@ function gt -d "Gradle toolbox"
             __gt_cmd_install $argv
         case use
             __gt_cmd_use $argv
+        case doctor
+            __gt_cmd_doctor $argv
 
             # Default
         case '*'

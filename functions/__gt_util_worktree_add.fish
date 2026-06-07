@@ -9,5 +9,5 @@ function __gt_util_worktree_add
     __gt_util_git_exec worktree add $opts $branch_dir $committish
     or return
 
-    __gt_util_worktree_link_agents $branch_dir
+    __gt_util_worktree_provision $branch_dir
 end
